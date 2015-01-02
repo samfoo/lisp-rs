@@ -1,0 +1,3 @@
+#[pub]
+number -> int
+    = "-"?[0-9]+ { match_str.parse().unwrap() }
