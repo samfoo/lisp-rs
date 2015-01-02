@@ -1,0 +1,13 @@
+[package]
+
+name = "lisp-rs"
+version = "0.0.1"
+authors = ["Sam Gibson <sam@ifdown.net>"]
+
+[dependencies]
+
+peg = "~0.1.0"
+
+[dependencies.readline]
+
+git = "https://github.com/shaleh/rust-readline"
