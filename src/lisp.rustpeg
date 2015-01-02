@@ -1,3 +1,16 @@
+use lisp::{Atom, Expr};
+
 #[pub]
-number -> int
-    = "-"?[0-9]+ { match_str.parse().unwrap() }
+expr -> Expr
+    = atom
+    / "(" es:expr ++ " " ")" { Expr::Sexpr(es) }
+
+atom -> Expr
+    = operator
+    / number
+
+operator -> Expr
+    = [-+/*] { Expr::Atom(Atom::Symbol(match_str.to_string())) }
+
+number -> Expr
+    = "-"?[0-9]+ { Expr::Atom(Atom::Int(match_str.parse().unwrap())) }

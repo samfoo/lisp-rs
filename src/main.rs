@@ -1,8 +1,10 @@
 #![feature(phase)]
 
+#[phase(plugin)]
+extern crate peg_syntax_ext;
 extern crate readline;
 
-#[phase(plugin)] extern crate peg_syntax_ext;
+mod lisp;
 
 peg_file! parser("lisp.rustpeg");
 
@@ -14,7 +16,7 @@ fn main() {
         match readline::readline("lisp-rs> ") {
             Some(input) => {
                 readline::add_history(input.as_slice());
-                let expr = parser::number(input.as_slice());
+                let expr = parser::expr(input.as_slice());
                 println!("{}", expr);
             }
             None => {
