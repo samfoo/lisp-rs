@@ -10,7 +10,7 @@ atom -> Expr
     / number
 
 operator -> Expr
-    = [-+/*] { Expr::Atom(Atom::Symbol(match_str.to_string())) }
+    = [-+/*] { Expr::Atom(Atom::Sym(match_str.to_string())) }
 
 number -> Expr
     = "-"?[0-9]+ { Expr::Atom(Atom::Int(match_str.parse().unwrap())) }

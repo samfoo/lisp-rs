@@ -17,7 +17,7 @@ fn main() {
             Some(input) => {
                 readline::add_history(input.as_slice());
                 let expr = parser::expr(input.as_slice());
-                println!("{}", expr);
+                println!("{}", lisp::eval(expr.unwrap()));
             }
             None => {
                 println!("\nthanks for lisping!");
