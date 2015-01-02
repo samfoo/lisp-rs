@@ -1,15 +1,42 @@
-#[deriving(Show)]
+use std::fmt;
 #[deriving(Clone)]
 pub enum Expr {
     Sexpr(Vec<Expr>),
     Atom(Atom)
 }
 
-#[deriving(Show)]
 #[deriving(Clone)]
 pub enum Atom {
     Int(int),
     Sym(String)
+}
+
+impl fmt::Show for Atom {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Atom::Int(ref v) => write!(f, "{}", v),
+            Atom::Sym(ref v) => write!(f, "{}", v)
+        }
+    }
+}
+
+impl fmt::Show for Expr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Expr::Sexpr(ref v) => {
+                let cs = v
+                    .iter()
+                    .map(|e| format!("{}", e))
+                    .collect::<Vec<String>>()
+                    .connect(" ");
+
+                write!(f, "({})", cs)
+            },
+            Expr::Atom(ref a) => {
+                write!(f, "{}", a)
+            }
+        }
+    }
 }
 
 #[allow(dead_code)]

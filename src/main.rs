@@ -19,7 +19,10 @@ fn main() {
                 let expr = parser::expr(input.as_slice());
 
                 match expr {
-                    Ok(e) => println!("{}", lisp::eval(e)),
+                    Ok(e) => match lisp::eval(e) {
+                        Ok(r) => println!("{}", r),
+                        Err(r) => println!("{}", r)
+                    },
                     Err(e) => println!("{}", e)
                 }
             }
