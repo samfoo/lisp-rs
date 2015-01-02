@@ -43,8 +43,16 @@ pub fn sexpr(l: Vec<Expr>) -> Result<Expr, Error> {
     match l.as_slice() {
         [] => Ok(Expr::Sexpr(Vec::new())),
         [_] => Ok(Expr::Atom(Atom::Int(0))),
-        [Expr::Atom(Atom::Sym(ref func)), ref l, ref r] => {
-            arith(func.as_slice(), l.clone(), r.clone())
+        [Expr::Atom(Atom::Sym(ref func)), ref l] => {
+            arith(func.as_slice(), Expr::Atom(Atom::Int(0)), l.clone())
+        },
+        [Expr::Atom(Atom::Sym(ref func)), ref x, xs..] => {
+            xs.iter().fold(Ok(x.clone()), |m, r| {
+                match m {
+                    Ok(l) => arith(func.as_slice(), l, r.clone()),
+                    Err(e) => Err(e)
+                }
+            })
         },
         _ => Err(Error::InvalidType)
     }
