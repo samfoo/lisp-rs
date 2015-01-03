@@ -12,8 +12,8 @@ fn arith(l: Expr, r: Expr, op: &mut |int, int| -> Result<int, Error>) -> Result<
     }
 }
 
-fn do_arith(args: &[Expr], op: &mut |int, int| -> Result<int, Error>) -> Result<Expr, Error> {
-    match args {
+fn do_arith(args: Vec<Expr>, op: &mut |int, int| -> Result<int, Error>) -> Result<Expr, Error> {
+    match args.as_slice() {
         [] => Ok(Expr::Atom(Atom::Int(0))),
 
         [ref l] => {
@@ -31,25 +31,25 @@ fn do_arith(args: &[Expr], op: &mut |int, int| -> Result<int, Error>) -> Result<
     }
 }
 
-pub fn add(args: &[Expr]) -> Result<Expr, Error> {
+pub fn add(args: Vec<Expr>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         Ok(i1 + i2)
     })
 }
 
-pub fn sub(args: &[Expr]) -> Result<Expr, Error> {
+pub fn sub(args: Vec<Expr>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         Ok(i1 - i2)
     })
 }
 
-pub fn mul(args: &[Expr]) -> Result<Expr, Error> {
+pub fn mul(args: Vec<Expr>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         Ok(i1 * i2)
     })
 }
 
-pub fn div(args: &[Expr]) -> Result<Expr, Error> {
+pub fn div(args: Vec<Expr>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         match i2 {
             0 => Err(Error::ZeroDivision),
@@ -58,12 +58,12 @@ pub fn div(args: &[Expr]) -> Result<Expr, Error> {
     })
 }
 
-pub fn list(args: &[Expr]) -> Result<Expr, Error> {
-    Ok(Expr::Sexpr(args.to_vec()))
+pub fn list(args: Vec<Expr>) -> Result<Expr, Error> {
+    Ok(Expr::Sexpr(args))
 }
 
-pub fn tail(args: &[Expr]) -> Result<Expr, Error> {
-    match args {
+pub fn tail(args: Vec<Expr>) -> Result<Expr, Error> {
+    match args.as_slice() {
         [Expr::Sexpr(ref list)] => {
             match list.as_slice() {
                 [] => Err(Error::Runtime("can't tail empty list".to_string())),
@@ -80,8 +80,8 @@ pub fn tail(args: &[Expr]) -> Result<Expr, Error> {
     }
 }
 
-pub fn head(args: &[Expr]) -> Result<Expr, Error> {
-    match args {
+pub fn head(args: Vec<Expr>) -> Result<Expr, Error> {
+    match args.as_slice() {
         [Expr::Sexpr(ref list)] => {
             match list.first() {
                 Some(h) => Ok(h.clone()),
@@ -95,8 +95,8 @@ pub fn head(args: &[Expr]) -> Result<Expr, Error> {
     }
 }
 
-pub fn eval(args: &[Expr]) -> Result<Expr, Error> {
-    match args {
+pub fn eval(args: Vec<Expr>) -> Result<Expr, Error> {
+    match args.as_slice() {
         [ref a] => lisp::eval(a.clone()),
 
         _ => Err(Error::Arity("eval expects one argument (an sexpr)".to_string()))

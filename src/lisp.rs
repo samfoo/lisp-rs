@@ -1,5 +1,6 @@
 use builtin;
 use std::fmt;
+use std::collections::HashMap;
 
 #[deriving(Clone)]
 pub enum Expr {
@@ -8,10 +9,34 @@ pub enum Expr {
     Atom(Atom)
 }
 
+type Builtin = fn(Vec<Expr>) -> Result<Expr, Error>;
+
+struct Context {
+    table: HashMap<&'static str, Expr>
+}
+
+impl Context {
+    pub fn global() -> Context {
+        let mut tbl = HashMap::new();
+
+        tbl.insert("+",    Expr::Atom(Atom::Builtin(builtin::add)));
+        tbl.insert("-",    Expr::Atom(Atom::Builtin(builtin::sub)));
+        tbl.insert("*",    Expr::Atom(Atom::Builtin(builtin::mul)));
+        tbl.insert("/",    Expr::Atom(Atom::Builtin(builtin::div)));
+        tbl.insert("list", Expr::Atom(Atom::Builtin(builtin::list)));
+        tbl.insert("tail", Expr::Atom(Atom::Builtin(builtin::tail)));
+        tbl.insert("head", Expr::Atom(Atom::Builtin(builtin::head)));
+        tbl.insert("eval", Expr::Atom(Atom::Builtin(builtin::eval)));
+
+        Context { table: tbl }
+    }
+}
+
 #[deriving(Clone)]
 pub enum Atom {
     Int(int),
-    Sym(String)
+    Sym(String),
+    Builtin(Builtin)
 }
 
 impl fmt::Show for Atom {
@@ -19,6 +44,7 @@ impl fmt::Show for Atom {
         match *self {
             Atom::Int(ref v) => write!(f, "{}", v),
             Atom::Sym(ref v) => write!(f, "{}", v),
+            Atom::Builtin(_) => write!(f, "<function>")
         }
     }
 }
@@ -55,30 +81,35 @@ pub enum Error {
     Arity(String)
 }
 
-fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
-    let e = try!(eval_all(args));
-    let eargs = e.as_slice();
+fn lookup(name: &str) -> Option<Expr> {
+    let ctx = Context::global();
 
-    match func {
-        "+" => builtin::add(eargs),
-        "-" => builtin::sub(eargs),
-        "*" => builtin::mul(eargs),
-        "/" => builtin::div(eargs),
-        "list" => builtin::list(eargs),
-        "tail" => builtin::tail(eargs),
-        "head" => builtin::head(eargs),
-        "eval" => builtin::eval(eargs),
-        _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
+    match ctx.table.get(name) {
+        Some(e) => Some(e.clone()),
+        None => None
+    }
+}
+
+fn call(name: &str, xs: &[Expr]) -> Result<Expr, Error> {
+    match lookup(name) {
+        Some(a) => {
+            match a {
+                Expr::Atom(Atom::Builtin(f)) => f(xs.to_vec()),
+                _ => Err(Error::InvalidType(format!("`{}` not a function", a)))
+            }
+        },
+
+        None => Err(Error::NameResolution(format!("`{}` not in current context", name.to_string())))
     }
 }
 
 pub fn sexpr(l: Vec<Expr>) -> Result<Expr, Error> {
-    match l.as_slice() {
+    let el = try!(eval_all(l.as_slice()));
+
+    match el.as_slice() {
         [] => Ok(Expr::Sexpr(Vec::new())),
 
-        [Expr::Atom(Atom::Sym(ref func)), xs..] => {
-            call(func.as_slice(), xs)
-        },
+        [Expr::Atom(Atom::Sym(ref name)), xs..] => call(name.as_slice(), xs),
 
         [ref e, _..] => Err(Error::InvalidType(format!("`{}` not a function", e)))
     }
