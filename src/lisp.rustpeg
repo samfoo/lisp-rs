@@ -6,11 +6,11 @@ expr -> Expr
     / "(" es:expr ++ " " ")" { Expr::Sexpr(es) }
 
 atom -> Expr
-    = operator
+    = symbol 
     / number
 
-operator -> Expr
-    = [-+/*] { Expr::Atom(Atom::Sym(match_str.to_string())) }
+symbol -> Expr
+    = [a-zA-Z-+/*]+ { Expr::Atom(Atom::Sym(match_str.to_string())) }
 
 number -> Expr
     = "-"?[0-9]+ { Expr::Atom(Atom::Int(match_str.parse().unwrap())) }

@@ -43,7 +43,8 @@ impl fmt::Show for Expr {
 #[deriving(Show)]
 pub enum Error {
     ZeroDivision,
-    InvalidType
+    NameResolution(String),
+    InvalidType(String)
 }
 
 fn arith(op: &str, l: Expr, r: Expr) -> Result<Expr, Error> {
@@ -59,29 +60,52 @@ fn arith(op: &str, l: Expr, r: Expr) -> Result<Expr, Error> {
                         _ => Ok(Expr::Atom(Atom::Int(i1 / i2)))
                     }
                 }
-                _ => Err(Error::InvalidType)
+                _ => Err(Error::NameResolution(format!("`{}` is not an arithmetic operator", op.to_string())))
             }
         },
-        _ => Err(Error::InvalidType)
+        (Err(e), _) => Err(e),
+        (_, Err(e)) => Err(e),
+        (Ok(Expr::Atom(Atom::Int(_))), nan) => Err(Error::InvalidType(format!("`{}` is not a number", nan.unwrap()))),
+        (nan, Ok(Expr::Atom(Atom::Int(_)))) => Err(Error::InvalidType(format!("`{}` is not a number", nan.unwrap()))),
+        (nan1, _) => Err(Error::InvalidType(format!("`{}` is not a number", nan1.unwrap())))
+    }
+}
+
+fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
+    match func {
+        "+" | "-" | "*" | "/" => {
+            match args {
+                [] => Ok(Expr::Atom(Atom::Int(0))),
+
+                [ref l] => {
+                    arith(func, Expr::Atom(Atom::Int(0)), l.clone())
+                },
+
+                [ref x, xs..] => {
+                    xs.iter().fold(Ok(x.clone()), |m, r| {
+                        match m {
+                            Ok(l) => arith(func, l, r.clone()),
+                            Err(e) => Err(e)
+                        }
+                    })
+                },
+            }
+        }
+        _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
     }
 }
 
 pub fn sexpr(l: Vec<Expr>) -> Result<Expr, Error> {
     match l.as_slice() {
         [] => Ok(Expr::Sexpr(Vec::new())),
-        [_] => Ok(Expr::Atom(Atom::Int(0))),
-        [Expr::Atom(Atom::Sym(ref func)), ref l] => {
-            arith(func.as_slice(), Expr::Atom(Atom::Int(0)), l.clone())
+
+        [Expr::Atom(Atom::Sym(ref func))] => call(func.as_slice(), &[]),
+
+        [Expr::Atom(Atom::Sym(ref func)), xs..] => {
+            call(func.as_slice(), xs)
         },
-        [Expr::Atom(Atom::Sym(ref func)), ref x, xs..] => {
-            xs.iter().fold(Ok(x.clone()), |m, r| {
-                match m {
-                    Ok(l) => arith(func.as_slice(), l, r.clone()),
-                    Err(e) => Err(e)
-                }
-            })
-        },
-        _ => Err(Error::InvalidType)
+
+        [ref e, xs..] => Err(Error::InvalidType(format!("`{}` not a function", e)))
     }
 }
 
