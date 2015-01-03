@@ -8,6 +8,7 @@ expr -> Expr
 
 sexpr -> Expr
     = "(" se:expr ++ " " ")" { Expr::Sexpr(se) }
+    / "()" { Expr::Sexpr(Vec::new()) }
 
 qexpr -> Expr
     = "'" se:sexpr { Expr::Qexpr(box se) }

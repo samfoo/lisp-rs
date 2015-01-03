@@ -46,6 +46,7 @@ impl fmt::Show for Expr {
 #[allow(dead_code)]
 #[deriving(Show)]
 pub enum Error {
+    Runtime(String),
     ZeroDivision,
     NameResolution(String),
     InvalidType(String),
@@ -53,8 +54,8 @@ pub enum Error {
 }
 
 fn arith(op: &str, l: Expr, r: Expr) -> Result<Expr, Error> {
-    match (eval(l), eval(r)) {
-        (Ok(Expr::Atom(Atom::Int(i1))), Ok(Expr::Atom(Atom::Int(i2)))) => {
+    match (l, r) {
+        (Expr::Atom(Atom::Int(i1)), Expr::Atom(Atom::Int(i2))) => {
             match op {
                 "+" => Ok(Expr::Atom(Atom::Int(i1 + i2))),
                 "-" => Ok(Expr::Atom(Atom::Int(i1 - i2))),
@@ -68,11 +69,9 @@ fn arith(op: &str, l: Expr, r: Expr) -> Result<Expr, Error> {
                 _ => Err(Error::NameResolution(format!("`{}` is not an arithmetic operator", op.to_string())))
             }
         },
-        (Err(e), _) => Err(e),
-        (_, Err(e)) => Err(e),
-        (Ok(Expr::Atom(Atom::Int(_))), nan) => Err(Error::InvalidType(format!("`{}` is not a number", nan.unwrap()))),
-        (nan, Ok(Expr::Atom(Atom::Int(_)))) => Err(Error::InvalidType(format!("`{}` is not a number", nan.unwrap()))),
-        (nan1, _) => Err(Error::InvalidType(format!("`{}` is not a number", nan1.unwrap())))
+        (Expr::Atom(Atom::Int(_)), nan) => Err(Error::InvalidType(format!("`{}` is not a number", nan))),
+        (nan, Expr::Atom(Atom::Int(_))) => Err(Error::InvalidType(format!("`{}` is not a number", nan))),
+        (nan1, _) => Err(Error::InvalidType(format!("`{}` is not a number", nan1)))
     }
 }
 
@@ -96,37 +95,34 @@ fn builtin_arith(func: &str, args: &[Expr]) -> Result<Expr, Error> {
 }
 
 fn builtin_list(args: &[Expr]) -> Result<Expr, Error> {
-    match eval_all(args) {
-        Ok(v) => Ok(Expr::Sexpr(v)),
-        Err(e) => Err(e)
-    }
+    Ok(Expr::Sexpr(args.to_vec()))
 }
 
 fn builtin_tail(args: &[Expr]) -> Result<Expr, Error> {
     match args {
-        [ref list] => {
-            match eval(list.clone()) {
-                Ok(Expr::Sexpr(v)) => {
-                    let tail = v.tail();
-
+        [Expr::Sexpr(ref list)] => {
+            match list.as_slice() {
+                [] => Err(Error::Runtime("can't tail empty list".to_string())),
+                _ => {
+                    let tail = list.tail();
                     Ok(Expr::Sexpr(tail.to_vec()))
-                },
-
-                Ok(other) => Err(Error::InvalidType(format!("`{}` not a list", other))),
-
-                Err(e) => Err(e)
+                }
             }
         },
+
+        [ref other] => Err(Error::InvalidType(format!("`{}` not a list", other))),
 
         _ => Err(Error::Arity("tail expects one argument".to_string()))
     }
 }
 
 fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
+    let eargs = try!(eval_all(args));
+
     match func {
-        "+" | "-" | "*" | "/" => builtin_arith(func, args),
-        "list" => builtin_list(args),
-        "tail" => builtin_tail(args),
+        "+" | "-" | "*" | "/" => builtin_arith(func, eargs.as_slice()),
+        "list" => builtin_list(eargs.as_slice()),
+        "tail" => builtin_tail(eargs.as_slice()),
         _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
     }
 }
@@ -134,8 +130,6 @@ fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
 pub fn sexpr(l: Vec<Expr>) -> Result<Expr, Error> {
     match l.as_slice() {
         [] => Ok(Expr::Sexpr(Vec::new())),
-
-        [Expr::Atom(Atom::Sym(ref func))] => call(func.as_slice(), &[]),
 
         [Expr::Atom(Atom::Sym(ref func)), xs..] => {
             call(func.as_slice(), xs)
