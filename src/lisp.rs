@@ -182,6 +182,6 @@ pub fn eval(e: Expr) -> Result<Expr, Error> {
     match e {
         Expr::Sexpr(es) => sexpr(es),
         Expr::Atom(a) => Ok(Expr::Atom(a)),
-        Expr::Qexpr(qe) => Ok((*qe).clone())
+        Expr::Qexpr(qe) => Ok(*qe)
     }
 }
