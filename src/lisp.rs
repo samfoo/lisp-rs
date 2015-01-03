@@ -1,4 +1,6 @@
+use builtin;
 use std::fmt;
+
 #[deriving(Clone)]
 pub enum Expr {
     Sexpr(Vec<Expr>),
@@ -16,7 +18,7 @@ impl fmt::Show for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Atom::Int(ref v) => write!(f, "{}", v),
-            Atom::Sym(ref v) => write!(f, "{}", v)
+            Atom::Sym(ref v) => write!(f, "{}", v),
         }
     }
 }
@@ -53,102 +55,19 @@ pub enum Error {
     Arity(String)
 }
 
-fn arith(op: &str, l: Expr, r: Expr) -> Result<Expr, Error> {
-    match (l, r) {
-        (Expr::Atom(Atom::Int(i1)), Expr::Atom(Atom::Int(i2))) => {
-            match op {
-                "+" => Ok(Expr::Atom(Atom::Int(i1 + i2))),
-                "-" => Ok(Expr::Atom(Atom::Int(i1 - i2))),
-                "*" => Ok(Expr::Atom(Atom::Int(i1 * i2))),
-                "/" => {
-                    match i2 {
-                        0 => Err(Error::ZeroDivision),
-                        _ => Ok(Expr::Atom(Atom::Int(i1 / i2)))
-                    }
-                }
-                _ => Err(Error::NameResolution(format!("`{}` is not an arithmetic operator", op.to_string())))
-            }
-        },
-        (Expr::Atom(Atom::Int(_)), nan) => Err(Error::InvalidType(format!("`{}` is not a number", nan))),
-        (nan, Expr::Atom(Atom::Int(_))) => Err(Error::InvalidType(format!("`{}` is not a number", nan))),
-        (nan1, _) => Err(Error::InvalidType(format!("`{}` is not a number", nan1)))
-    }
-}
-
-fn builtin_arith(func: &str, args: &[Expr]) -> Result<Expr, Error> {
-    match args {
-        [] => Ok(Expr::Atom(Atom::Int(0))),
-
-        [ref l] => {
-            arith(func, Expr::Atom(Atom::Int(0)), l.clone())
-        },
-
-        [ref x, xs..] => {
-            xs.iter().fold(Ok(x.clone()), |m, r| {
-                match m {
-                    Ok(l) => arith(func, l, r.clone()),
-                    Err(e) => Err(e)
-                }
-            })
-        },
-    }
-}
-
-fn builtin_list(args: &[Expr]) -> Result<Expr, Error> {
-    Ok(Expr::Sexpr(args.to_vec()))
-}
-
-fn builtin_tail(args: &[Expr]) -> Result<Expr, Error> {
-    match args {
-        [Expr::Sexpr(ref list)] => {
-            match list.as_slice() {
-                [] => Err(Error::Runtime("can't tail empty list".to_string())),
-                _ => {
-                    let tail = list.tail();
-                    Ok(Expr::Sexpr(tail.to_vec()))
-                }
-            }
-        },
-
-        [ref other] => Err(Error::InvalidType(format!("`{}` not a list", other))),
-
-        _ => Err(Error::Arity("tail expects one argument (a list)".to_string()))
-    }
-}
-
-fn builtin_head(args: &[Expr]) -> Result<Expr, Error> {
-    match args {
-        [Expr::Sexpr(ref list)] => {
-            match list.first() {
-                Some(h) => Ok(h.clone()),
-                None => Err(Error::Runtime("can't head empty list".to_string())),
-            }
-        },
-
-        [ref other] => Err(Error::InvalidType(format!("`{}` not a list", other))),
-
-        _ => Err(Error::Arity("head expects one argument (a list)".to_string()))
-    }
-}
-
-fn builtin_eval(args: &[Expr]) -> Result<Expr, Error> {
-    match args {
-        [ref a] => eval(a.clone()),
-
-        _ => Err(Error::Arity("eval expects one argument (an sexpr)".to_string()))
-    }
-}
-
 fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
     let e = try!(eval_all(args));
     let eargs = e.as_slice();
 
     match func {
-        "+" | "-" | "*" | "/" => builtin_arith(func, eargs),
-        "list" => builtin_list(eargs),
-        "tail" => builtin_tail(eargs),
-        "head" => builtin_head(eargs),
-        "eval" => builtin_eval(eargs),
+        "+" => builtin::add(eargs),
+        "-" => builtin::sub(eargs),
+        "*" => builtin::mul(eargs),
+        "/" => builtin::div(eargs),
+        "list" => builtin::list(eargs),
+        "tail" => builtin::tail(eargs),
+        "head" => builtin::head(eargs),
+        "eval" => builtin::eval(eargs),
         _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
     }
 }

@@ -5,6 +5,7 @@ extern crate peg_syntax_ext;
 extern crate readline;
 
 mod lisp;
+mod builtin;
 
 peg_file! parser("lisp.rustpeg");
 
