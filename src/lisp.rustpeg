@@ -3,7 +3,15 @@ use lisp::{Atom, Expr};
 #[pub]
 expr -> Expr
     = atom
-    / "(" es:expr ++ " " ")" { Expr::Sexpr(es) }
+    / sexpr
+    / qexpr
+
+sexpr -> Expr
+    = "(" se:expr ++ " " ")" { Expr::Sexpr(se) }
+
+qexpr -> Expr
+    = "'" se:sexpr { Expr::Qexpr(box se) }
+    / "'" a:atom { Expr::Qexpr(box a) }
 
 atom -> Expr
     = symbol 

@@ -2,6 +2,7 @@ use std::fmt;
 #[deriving(Clone)]
 pub enum Expr {
     Sexpr(Vec<Expr>),
+    Qexpr(Box<Expr>),
     Atom(Atom)
 }
 
@@ -34,6 +35,9 @@ impl fmt::Show for Expr {
             },
             Expr::Atom(ref a) => {
                 write!(f, "{}", a)
+            },
+            Expr::Qexpr(ref e) => {
+                write!(f, "{}", e)
             }
         }
     }
@@ -71,45 +75,49 @@ fn arith(op: &str, l: Expr, r: Expr) -> Result<Expr, Error> {
     }
 }
 
+fn builtin_arith(func: &str, args: &[Expr]) -> Result<Expr, Error> {
+    match args {
+        [] => Ok(Expr::Atom(Atom::Int(0))),
+
+        [ref l] => {
+            arith(func, Expr::Atom(Atom::Int(0)), l.clone())
+        },
+
+        [ref x, xs..] => {
+            xs.iter().fold(Ok(x.clone()), |m, r| {
+                match m {
+                    Ok(l) => arith(func, l, r.clone()),
+                    Err(e) => Err(e)
+                }
+            })
+        },
+    }
+}
+
+fn builtin_list(args: &[Expr]) -> Result<Expr, Error> {
+    match eval_all(args) {
+        Ok(v) => Ok(Expr::Sexpr(v)),
+        Err(e) => Err(e)
+    }
+}
+
+fn builtin_tail(args: &[Expr]) -> Result<Expr, Error> {
+    match args {
+        [] => Ok(Expr::Sexpr(Vec::new())),
+
+        _ => {
+            let mut l = Vec::new();
+            l.push_all(args.tail());
+            Ok(Expr::Sexpr(l))
+        }
+    }
+}
+
 fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
     match func {
-        "+" | "-" | "*" | "/" => {
-            match args {
-                [] => Ok(Expr::Atom(Atom::Int(0))),
-
-                [ref l] => {
-                    arith(func, Expr::Atom(Atom::Int(0)), l.clone())
-                },
-
-                [ref x, xs..] => {
-                    xs.iter().fold(Ok(x.clone()), |m, r| {
-                        match m {
-                            Ok(l) => arith(func, l, r.clone()),
-                            Err(e) => Err(e)
-                        }
-                    })
-                },
-            }
-        }
-
-        "list" => {
-            let mut l = Vec::new();
-            l.push_all(args);
-            Ok(Expr::Sexpr(l))
-        },
-
-        "tail" => {
-            match args {
-                [] => Ok(Expr::Sexpr(Vec::new())),
-
-                _ => {
-                    let mut l = Vec::new();
-                    l.push_all(args.tail());
-                    Ok(Expr::Sexpr(l))
-                }
-            }
-        },
-
+        "+" | "-" | "*" | "/" => builtin_arith(func, args),
+        "list" => builtin_list(args),
+        "tail" => builtin_tail(args),
         _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
     }
 }
@@ -128,9 +136,23 @@ pub fn sexpr(l: Vec<Expr>) -> Result<Expr, Error> {
     }
 }
 
+fn eval_all(list: &[Expr]) -> Result<Vec<Expr>, Error> {
+    list.iter()
+        .fold(Ok::<Vec<Expr>, Error>(Vec::new()), |m, e| {
+            match m {
+                Ok(mut r) => {
+                    r.push(try!(eval(e.clone())));
+                    Ok(r)
+                },
+                Err(e) => Err(e)
+            }
+        })
+}
+
 pub fn eval(e: Expr) -> Result<Expr, Error> {
     match e {
         Expr::Sexpr(es) => sexpr(es),
-        Expr::Atom(a) => Ok(Expr::Atom(a))
+        Expr::Atom(a) => Ok(Expr::Atom(a)),
+        Expr::Qexpr(qe) => Ok((*qe).clone())
     }
 }
