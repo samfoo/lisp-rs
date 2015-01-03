@@ -48,7 +48,8 @@ impl fmt::Show for Expr {
 pub enum Error {
     ZeroDivision,
     NameResolution(String),
-    InvalidType(String)
+    InvalidType(String),
+    Arity(String)
 }
 
 fn arith(op: &str, l: Expr, r: Expr) -> Result<Expr, Error> {
@@ -103,13 +104,21 @@ fn builtin_list(args: &[Expr]) -> Result<Expr, Error> {
 
 fn builtin_tail(args: &[Expr]) -> Result<Expr, Error> {
     match args {
-        [] => Ok(Expr::Sexpr(Vec::new())),
+        [ref list] => {
+            match eval(list.clone()) {
+                Ok(Expr::Sexpr(v)) => {
+                    let tail = v.tail();
 
-        _ => {
-            let mut l = Vec::new();
-            l.push_all(args.tail());
-            Ok(Expr::Sexpr(l))
-        }
+                    Ok(Expr::Sexpr(tail.to_vec()))
+                },
+
+                Ok(other) => Err(Error::InvalidType(format!("`{}` not a list", other))),
+
+                Err(e) => Err(e)
+            }
+        },
+
+        _ => Err(Error::Arity("tail expects one argument".to_string()))
     }
 }
 
