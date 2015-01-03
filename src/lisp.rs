@@ -112,7 +112,7 @@ fn builtin_tail(args: &[Expr]) -> Result<Expr, Error> {
 
         [ref other] => Err(Error::InvalidType(format!("`{}` not a list", other))),
 
-        _ => Err(Error::Arity("tail expects one argument".to_string()))
+        _ => Err(Error::Arity("tail expects one argument (a list)".to_string()))
     }
 }
 
@@ -127,7 +127,15 @@ fn builtin_head(args: &[Expr]) -> Result<Expr, Error> {
 
         [ref other] => Err(Error::InvalidType(format!("`{}` not a list", other))),
 
-        _ => Err(Error::Arity("head expects one argument".to_string()))
+        _ => Err(Error::Arity("head expects one argument (a list)".to_string()))
+    }
+}
+
+fn builtin_eval(args: &[Expr]) -> Result<Expr, Error> {
+    match args {
+        [ref a] => eval(a.clone()),
+
+        _ => Err(Error::Arity("eval expects one argument (an sexpr)".to_string()))
     }
 }
 
@@ -140,6 +148,7 @@ fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
         "list" => builtin_list(eargs),
         "tail" => builtin_tail(eargs),
         "head" => builtin_head(eargs),
+        "eval" => builtin_eval(eargs),
         _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
     }
 }
