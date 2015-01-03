@@ -91,6 +91,25 @@ fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
                 },
             }
         }
+
+        "list" => {
+            let mut l = Vec::new();
+            l.push_all(args);
+            Ok(Expr::Sexpr(l))
+        },
+
+        "tail" => {
+            match args {
+                [] => Ok(Expr::Sexpr(Vec::new())),
+
+                _ => {
+                    let mut l = Vec::new();
+                    l.push_all(args.tail());
+                    Ok(Expr::Sexpr(l))
+                }
+            }
+        },
+
         _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
     }
 }
@@ -105,7 +124,7 @@ pub fn sexpr(l: Vec<Expr>) -> Result<Expr, Error> {
             call(func.as_slice(), xs)
         },
 
-        [ref e, xs..] => Err(Error::InvalidType(format!("`{}` not a function", e)))
+        [ref e, _..] => Err(Error::InvalidType(format!("`{}` not a function", e)))
     }
 }
 
