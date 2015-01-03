@@ -116,13 +116,30 @@ fn builtin_tail(args: &[Expr]) -> Result<Expr, Error> {
     }
 }
 
+fn builtin_head(args: &[Expr]) -> Result<Expr, Error> {
+    match args {
+        [Expr::Sexpr(ref list)] => {
+            match list.first() {
+                Some(h) => Ok(h.clone()),
+                None => Err(Error::Runtime("can't head empty list".to_string())),
+            }
+        },
+
+        [ref other] => Err(Error::InvalidType(format!("`{}` not a list", other))),
+
+        _ => Err(Error::Arity("head expects one argument".to_string()))
+    }
+}
+
 fn call(func: &str, args: &[Expr]) -> Result<Expr, Error> {
-    let eargs = try!(eval_all(args));
+    let e = try!(eval_all(args));
+    let eargs = e.as_slice();
 
     match func {
-        "+" | "-" | "*" | "/" => builtin_arith(func, eargs.as_slice()),
-        "list" => builtin_list(eargs.as_slice()),
-        "tail" => builtin_tail(eargs.as_slice()),
+        "+" | "-" | "*" | "/" => builtin_arith(func, eargs),
+        "list" => builtin_list(eargs),
+        "tail" => builtin_tail(eargs),
+        "head" => builtin_head(eargs),
         _ => Err(Error::NameResolution(format!("`{}` not in current context", func.to_string())))
     }
 }
