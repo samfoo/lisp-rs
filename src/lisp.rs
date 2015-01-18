@@ -9,8 +9,9 @@ pub enum Expr {
     Atom(Atom)
 }
 
-type Builtin = fn(Vec<Expr>) -> Result<Expr, Error>;
+type Builtin = fn(Vec<Expr>, Context) -> Result<Expr, Error>;
 
+#[deriving(Clone)]
 pub struct Context {
     table: HashMap<&'static str, Expr>
 }
@@ -92,7 +93,7 @@ fn call(name: &str, xs: &[Expr], ctx: &Context) -> Result<Expr, Error> {
     match lookup(name, ctx) {
         Some(a) => {
             match a {
-                Expr::Atom(Atom::Builtin(f)) => f(xs.to_vec()),
+                Expr::Atom(Atom::Builtin(f)) => f(xs.to_vec(), (*ctx).clone()),
                 _ => Err(Error::InvalidType(format!("`{}` not a function", a)))
             }
         },
