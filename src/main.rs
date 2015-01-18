@@ -17,10 +17,12 @@ fn main() {
         match readline::readline("lisp-rs> ") {
             Some(input) => {
                 readline::add_history(input.as_slice());
+
+                let ctx = lisp::Context::global();
                 let expr = parser::expr(input.as_slice());
 
                 match expr {
-                    Ok(e) => match lisp::eval(e) {
+                    Ok(e) => match lisp::eval(e, &ctx) {
                         Ok(r) => println!("{}", r),
                         Err(r) => println!("{}", r)
                     },

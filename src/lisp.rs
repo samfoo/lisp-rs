@@ -11,7 +11,7 @@ pub enum Expr {
 
 type Builtin = fn(Vec<Expr>) -> Result<Expr, Error>;
 
-struct Context {
+pub struct Context {
     table: HashMap<&'static str, Expr>
 }
 
@@ -81,17 +81,15 @@ pub enum Error {
     Arity(String)
 }
 
-fn lookup(name: &str) -> Option<Expr> {
-    let ctx = Context::global();
-
+fn lookup(name: &str, ctx: &Context) -> Option<Expr> {
     match ctx.table.get(name) {
         Some(e) => Some(e.clone()),
         None => None
     }
 }
 
-fn call(name: &str, xs: &[Expr]) -> Result<Expr, Error> {
-    match lookup(name) {
+fn call(name: &str, xs: &[Expr], ctx: &Context) -> Result<Expr, Error> {
+    match lookup(name, ctx) {
         Some(a) => {
             match a {
                 Expr::Atom(Atom::Builtin(f)) => f(xs.to_vec()),
@@ -103,24 +101,40 @@ fn call(name: &str, xs: &[Expr]) -> Result<Expr, Error> {
     }
 }
 
-pub fn sexpr(l: Vec<Expr>) -> Result<Expr, Error> {
-    let el = try!(eval_all(l.as_slice()));
-
-    match el.as_slice() {
+pub fn sexpr(l: Vec<Expr>, ctx: &Context) -> Result<Expr, Error> {
+    match l.as_slice() {
         [] => Ok(Expr::Sexpr(Vec::new())),
 
-        [Expr::Atom(Atom::Sym(ref name)), xs..] => call(name.as_slice(), xs),
+        [Expr::Atom(Atom::Sym(ref name)), xs..] => {
+            match eval_all(xs, ctx) {
+                Ok(args) => call(name.as_slice(), args.as_slice(), ctx),
+                Err(e) => Err(e)
+            }
+        },
 
         [ref e, _..] => Err(Error::InvalidType(format!("`{}` not a function", e)))
     }
 }
 
-fn eval_all(list: &[Expr]) -> Result<Vec<Expr>, Error> {
+pub fn atom(a: Atom, ctx: &Context) -> Result<Expr, Error> {
+    match a {
+        Atom::Sym(sym) => {
+            match lookup(sym.as_slice(), ctx) {
+                Some(v) => Ok(v),
+                None => Err(Error::NameResolution(format!("`{}` not in current context", sym.to_string())))
+            }
+        },
+
+        _ => Ok(Expr::Atom(a))
+    }
+}
+
+fn eval_all(list: &[Expr], ctx: &Context) -> Result<Vec<Expr>, Error> {
     list.iter()
         .fold(Ok::<Vec<Expr>, Error>(Vec::new()), |m, e| {
             match m {
                 Ok(mut r) => {
-                    r.push(try!(eval(e.clone())));
+                    r.push(try!(eval(e.clone(), ctx)));
                     Ok(r)
                 },
                 Err(e) => Err(e)
@@ -128,10 +142,10 @@ fn eval_all(list: &[Expr]) -> Result<Vec<Expr>, Error> {
         })
 }
 
-pub fn eval(e: Expr) -> Result<Expr, Error> {
+pub fn eval(e: Expr, ctx: &Context) -> Result<Expr, Error> {
     match e {
-        Expr::Sexpr(es) => sexpr(es),
-        Expr::Atom(a) => Ok(Expr::Atom(a)),
+        Expr::Sexpr(es) => sexpr(es, ctx),
+        Expr::Atom(a) => atom(a, ctx),
         Expr::Qexpr(qe) => Ok(*qe)
     }
 }

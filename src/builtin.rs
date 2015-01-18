@@ -1,4 +1,3 @@
-use lisp;
 use lisp::{Expr, Atom, Error};
 
 fn arith(l: Expr, r: Expr, op: &mut |int, int| -> Result<int, Error>) -> Result<Expr, Error> {
@@ -97,7 +96,7 @@ pub fn head(args: Vec<Expr>) -> Result<Expr, Error> {
 
 pub fn eval(args: Vec<Expr>) -> Result<Expr, Error> {
     match args.as_slice() {
-        [ref a] => lisp::eval(a.clone()),
+        [ref a] => Ok(a.clone()),//lisp::eval(a.clone()),
 
         _ => Err(Error::Arity("eval expects one argument (an sexpr)".to_string()))
     }
