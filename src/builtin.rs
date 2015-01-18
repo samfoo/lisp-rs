@@ -1,5 +1,5 @@
 use lisp;
-use lisp::{Context, Expr, Atom, Error};
+use lisp::{Context, Expr, Atom, Func, Error};
 
 fn arith(l: Expr, r: Expr, op: &mut |int, int| -> Result<int, Error>) -> Result<Expr, Error> {
     match (l, r) {
@@ -100,6 +100,39 @@ pub fn eval(args: Vec<Expr>, ctx: Context) -> Result<Expr, Error> {
         [ref a] => lisp::eval(a.clone(), &ctx),
 
         _ => Err(Error::Arity("eval expects one argument (an sexpr)".to_string()))
+    }
+}
+
+fn as_name(e: &Expr) -> Result<String, Error> {
+    match *e {
+        Expr::Atom(Atom::Sym(ref name)) => Ok(name.clone()),
+        _ => Err(Error::InvalidType(format!("formals declaration expects a list of symbols, `{}` is not a symbol", e)))
+    }
+}
+
+fn as_formals(fs: &Vec<Expr>) -> Result<Vec<String>, Error> {
+    fs.iter().fold(Ok(Vec::new()), |m, a| {
+        match m {
+            Ok(mut xs) => {
+                let name = try!(as_name(a));
+                xs.push(name);
+                Ok(xs)
+            },
+
+            Err(e) => Err(e)
+        }
+    })
+}
+
+pub fn lambda(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+    match args.as_slice() {
+        [Expr::Sexpr(ref fs), ref body] => {
+            let formals = try!(as_formals(fs));
+
+            Ok(Expr::Atom(Atom::Fun(Func::Lambda(formals, box body.clone()))))
+        },
+
+        _ => Err(Error::Arity("lambda expects two arguments (qexpr, qexpr)".to_string()))
     }
 }
 

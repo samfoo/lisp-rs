@@ -12,24 +12,32 @@ pub enum Expr {
 type Builtin = fn(Vec<Expr>, Context) -> Result<Expr, Error>;
 
 #[deriving(Clone)]
+pub enum Func {
+    Builtin(Builtin),
+    Lambda(Vec<String>, Box<Expr>)
+}
+
+#[deriving(Clone)]
 pub struct Context {
-    table: HashMap<&'static str, Expr>
+    table: HashMap<String, Expr>,
+    parent: Option<Box<Context>>
 }
 
 impl Context {
     pub fn global() -> Context {
         let mut tbl = HashMap::new();
 
-        tbl.insert("+",    Expr::Atom(Atom::Builtin(builtin::add)));
-        tbl.insert("-",    Expr::Atom(Atom::Builtin(builtin::sub)));
-        tbl.insert("*",    Expr::Atom(Atom::Builtin(builtin::mul)));
-        tbl.insert("/",    Expr::Atom(Atom::Builtin(builtin::div)));
-        tbl.insert("list", Expr::Atom(Atom::Builtin(builtin::list)));
-        tbl.insert("tail", Expr::Atom(Atom::Builtin(builtin::tail)));
-        tbl.insert("head", Expr::Atom(Atom::Builtin(builtin::head)));
-        tbl.insert("eval", Expr::Atom(Atom::Builtin(builtin::eval)));
+        tbl.insert("+".to_string(),      Expr::Atom(Atom::Fun(Func::Builtin(builtin::add))));
+        tbl.insert("-".to_string(),      Expr::Atom(Atom::Fun(Func::Builtin(builtin::sub))));
+        tbl.insert("*".to_string(),      Expr::Atom(Atom::Fun(Func::Builtin(builtin::mul))));
+        tbl.insert("/".to_string(),      Expr::Atom(Atom::Fun(Func::Builtin(builtin::div))));
+        tbl.insert("list".to_string(),   Expr::Atom(Atom::Fun(Func::Builtin(builtin::list))));
+        tbl.insert("tail".to_string(),   Expr::Atom(Atom::Fun(Func::Builtin(builtin::tail))));
+        tbl.insert("head".to_string(),   Expr::Atom(Atom::Fun(Func::Builtin(builtin::head))));
+        tbl.insert("eval".to_string(),   Expr::Atom(Atom::Fun(Func::Builtin(builtin::eval))));
+        tbl.insert("lambda".to_string(), Expr::Atom(Atom::Fun(Func::Builtin(builtin::lambda))));
 
-        Context { table: tbl }
+        Context { table: tbl, parent: None }
     }
 }
 
@@ -37,7 +45,7 @@ impl Context {
 pub enum Atom {
     Int(int),
     Sym(String),
-    Builtin(Builtin)
+    Fun(Func)
 }
 
 impl fmt::Show for Atom {
@@ -45,7 +53,7 @@ impl fmt::Show for Atom {
         match *self {
             Atom::Int(ref v) => write!(f, "{}", v),
             Atom::Sym(ref v) => write!(f, "{}", v),
-            Atom::Builtin(_) => write!(f, "<function>")
+            Atom::Fun(_) => write!(f, "<function>")
         }
     }
 }
@@ -83,35 +91,64 @@ pub enum Error {
 }
 
 fn lookup(name: &str, ctx: &Context) -> Option<Expr> {
-    match ctx.table.get(name) {
-        Some(e) => Some(e.clone()),
-        None => None
+    match (ctx.table.get(name), (*ctx).parent.clone()) {
+        (Some(e), _) => Some(e.clone()),
+        (None, Some(p)) => lookup(name, &*p),
+        _ => None
     }
 }
 
-fn call(name: &str, xs: &[Expr], ctx: &Context) -> Result<Expr, Error> {
-    match lookup(name, ctx) {
-        Some(a) => {
-            match a {
-                Expr::Atom(Atom::Builtin(f)) => f(xs.to_vec(), (*ctx).clone()),
-                _ => Err(Error::InvalidType(format!("`{}` not a function", a)))
+fn call_lambda(formals: Vec<String>, body: &Expr, args: Vec<Expr>, ctx: &Context) -> Result<Expr, Error> {
+    if formals.len() != args.len() {
+        Err(Error::Arity(format!("expected {} args, found {}", formals.len(), args.len())))
+    } else {
+        let cctx = (*ctx).clone();
+        let bindings = formals.iter().zip(args.iter());
+
+        let bmap = bindings
+            .fold(
+                HashMap::new(),
+                |mut m, (name, val)| {
+                    m.insert(name.clone(), val.clone());
+                    m
+                });
+
+        let fctx = Context {
+            table: bmap,
+            parent: Some(box cctx)
+        };
+
+
+        eval((*body).clone(), &fctx)
+    }
+}
+
+fn call(fun: Atom, xs: &[Expr], ctx: &Context) -> Result<Expr, Error> {
+    match fun {
+        Atom::Sym(ref name) => {
+            match lookup(name.as_slice(), ctx) {
+                Some(Expr::Atom(Atom::Fun(Func::Builtin(b)))) => b(xs.to_vec(), (*ctx).clone()),
+                Some(Expr::Atom(Atom::Fun(Func::Lambda(fs, b)))) => call_lambda(fs, &*b, xs.to_vec(), ctx),
+                None => Err(Error::NameResolution(format!("`{}` not in current context", name.to_string()))),
+                _ => Err(Error::InvalidType(format!("`{}` not a function", fun)))
             }
         },
 
-        None => Err(Error::NameResolution(format!("`{}` not in current context", name.to_string())))
+        Atom::Fun(Func::Builtin(b)) => b(xs.to_vec(), (*ctx).clone()),
+
+        Atom::Fun(Func::Lambda(fs, b)) => call_lambda(fs, &*b, xs.to_vec(), ctx),
+
+        _ => Err(Error::InvalidType(format!("`{}` not a function", fun)))
     }
 }
 
 pub fn sexpr(l: Vec<Expr>, ctx: &Context) -> Result<Expr, Error> {
-    match l.as_slice() {
+    let es = try!(eval_all(l.as_slice(), ctx));
+
+    match es.as_slice() {
         [] => Ok(Expr::Sexpr(Vec::new())),
 
-        [Expr::Atom(Atom::Sym(ref name)), xs..] => {
-            match eval_all(xs, ctx) {
-                Ok(args) => call(name.as_slice(), args.as_slice(), ctx),
-                Err(e) => Err(e)
-            }
-        },
+        [Expr::Atom(ref a), xs..] => call((*a).clone(), xs, ctx),
 
         [ref e, _..] => Err(Error::InvalidType(format!("`{}` not a function", e)))
     }
