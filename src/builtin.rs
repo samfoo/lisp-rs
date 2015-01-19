@@ -1,3 +1,6 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use lisp;
 use lisp::{Context, Expr, Atom, Func, Error};
 
@@ -31,25 +34,25 @@ fn do_arith(args: Vec<Expr>, op: &mut |int, int| -> Result<int, Error>) -> Resul
     }
 }
 
-pub fn add(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn add(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         Ok(i1 + i2)
     })
 }
 
-pub fn sub(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn sub(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         Ok(i1 - i2)
     })
 }
 
-pub fn mul(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn mul(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         Ok(i1 * i2)
     })
 }
 
-pub fn div(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn div(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     do_arith(args, &mut |i1: int, i2: int| {
         match i2 {
             0 => Err(Error::ZeroDivision),
@@ -58,11 +61,11 @@ pub fn div(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
     })
 }
 
-pub fn list(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn list(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     Ok(Expr::Sexpr(args))
 }
 
-pub fn tail(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn tail(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     match args.as_slice() {
         [Expr::Sexpr(ref list)] => {
             match list.as_slice() {
@@ -80,7 +83,7 @@ pub fn tail(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
     }
 }
 
-pub fn head(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn head(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     match args.as_slice() {
         [Expr::Sexpr(ref list)] => {
             match list.first() {
@@ -95,9 +98,9 @@ pub fn head(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
     }
 }
 
-pub fn eval(args: Vec<Expr>, ctx: Context) -> Result<Expr, Error> {
+pub fn eval(args: Vec<Expr>, ctx: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     match args.as_slice() {
-        [ref a] => lisp::eval(a.clone(), &ctx),
+        [ref a] => lisp::eval(a.clone(), ctx),
 
         _ => Err(Error::Arity("eval expects one argument (an sexpr)".to_string()))
     }
@@ -124,7 +127,7 @@ fn as_formals(fs: &Vec<Expr>) -> Result<Vec<String>, Error> {
     })
 }
 
-pub fn lambda(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
+pub fn lambda(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     match args.as_slice() {
         [Expr::Sexpr(ref fs), ref body] => {
             let formals = try!(as_formals(fs));
@@ -136,3 +139,13 @@ pub fn lambda(args: Vec<Expr>, _: Context) -> Result<Expr, Error> {
     }
 }
 
+pub fn def(args: Vec<Expr>, ctx: Rc<RefCell<Context>>) -> Result<Expr, Error> {
+    match args.as_slice() {
+        [Expr::Atom(Atom::Sym(ref name)), ref val] => {
+            ctx.borrow_mut().table.insert(name.to_string(), val.clone());
+            Ok(val.clone())
+        },
+
+        _ => Err(Error::Arity("def expects two arguments (sym, expr)".to_string()))
+    }
+}
