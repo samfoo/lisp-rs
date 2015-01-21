@@ -4,10 +4,10 @@ use std::rc::Rc;
 use lisp;
 use lisp::{Context, Expr, Atom, Func, Error};
 
-fn arith(l: Expr, r: Expr, op: &mut |int, int| -> Result<int, Error>) -> Result<Expr, Error> {
+fn arith(l: Expr, r: Expr, op: fn(i64, i64) -> Result<i64, Error>) -> Result<Expr, Error> {
     match (l, r) {
         (Expr::Atom(Atom::Int(i1)), Expr::Atom(Atom::Int(i2))) => {
-            Ok(Expr::Atom(Atom::Int(try!((*op)(i1, i2)))))
+            Ok(Expr::Atom(Atom::Int(try!(op(i1, i2)))))
         },
         (Expr::Atom(Atom::Int(_)), nan) => Err(Error::InvalidType(format!("`{}` is not a number", nan))),
         (nan, Expr::Atom(Atom::Int(_))) => Err(Error::InvalidType(format!("`{}` is not a number", nan))),
@@ -15,7 +15,7 @@ fn arith(l: Expr, r: Expr, op: &mut |int, int| -> Result<int, Error>) -> Result<
     }
 }
 
-fn do_arith(args: Vec<Expr>, op: &mut |int, int| -> Result<int, Error>) -> Result<Expr, Error> {
+fn do_arith(args: Vec<Expr>, op: fn(i64, i64) -> Result<i64, Error>) -> Result<Expr, Error> {
     match args.as_slice() {
         [] => Ok(Expr::Atom(Atom::Int(0))),
 
@@ -35,30 +35,38 @@ fn do_arith(args: Vec<Expr>, op: &mut |int, int| -> Result<int, Error>) -> Resul
 }
 
 pub fn add(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
-    do_arith(args, &mut |i1: int, i2: int| {
-        Ok(i1 + i2)
-    })
+    fn _add(l: i64, r:i64) -> Result<i64, Error> {
+        Ok(l + r)
+    }
+
+    do_arith(args, _add)
 }
 
 pub fn sub(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
-    do_arith(args, &mut |i1: int, i2: int| {
-        Ok(i1 - i2)
-    })
+    fn _sub(l: i64, r:i64) -> Result<i64, Error> {
+        Ok(l - r)
+    }
+
+    do_arith(args, _sub)
 }
 
 pub fn mul(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
-    do_arith(args, &mut |i1: int, i2: int| {
-        Ok(i1 * i2)
-    })
+    fn _mul(l: i64, r:i64) -> Result<i64, Error> {
+        Ok(l * r)
+    }
+
+    do_arith(args, _mul)
 }
 
 pub fn div(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
-    do_arith(args, &mut |i1: int, i2: int| {
-        match i2 {
+    fn _div(l: i64, r: i64) -> Result<i64, Error> {
+        match r {
             0 => Err(Error::ZeroDivision),
-            _ => Ok(i1 / i2)
+            _ => Ok(l / r)
         }
-    })
+    }
+
+    do_arith(args, _div)
 }
 
 pub fn list(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
@@ -132,7 +140,7 @@ pub fn lambda(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
         [Expr::Sexpr(ref fs), ref body] => {
             let formals = try!(as_formals(fs));
 
-            Ok(Expr::Atom(Atom::Fun(Func::Lambda(formals, box body.clone()))))
+            Ok(Expr::Atom(Atom::Fun(Func::Lambda(formals, Box::new(body.clone())))))
         },
 
         _ => Err(Error::Arity("lambda expects two arguments (qexpr, qexpr)".to_string()))

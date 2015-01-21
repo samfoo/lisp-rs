@@ -10,4 +10,4 @@ peg = "~0.1.0"
 
 [dependencies.readline]
 
-git = "https://github.com/shaleh/rust-readline"
+git = "https://github.com/samfoo/rust-readline"

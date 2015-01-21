@@ -1,7 +1,7 @@
-#![feature(phase)]
+#![feature(box_syntax)]
+#![feature(plugin)]
+#[plugin] extern crate peg_syntax_ext;
 
-#[phase(plugin)]
-extern crate peg_syntax_ext;
 extern crate readline;
 
 use std::cell::RefCell;
@@ -28,9 +28,9 @@ fn main() {
                 match expr {
                     Ok(e) => match lisp::eval(e, ctx.clone()) {
                         Ok(r) => println!("{}", r),
-                        Err(r) => println!("{}", r)
+                        Err(r) => println!("{:?}", r)
                     },
-                    Err(e) => println!("{}", e)
+                    Err(e) => println!("{:?}", e)
                 }
             }
             None => {

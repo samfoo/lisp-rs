@@ -5,7 +5,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub enum Expr {
     Sexpr(Vec<Expr>),
     Qexpr(Box<Expr>),
@@ -14,13 +14,13 @@ pub enum Expr {
 
 type Builtin = fn(Vec<Expr>, Rc<RefCell<Context>>) -> Result<Expr, Error>;
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub enum Func {
     Builtin(Builtin),
     Lambda(Vec<String>, Box<Expr>)
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub struct Context {
     pub table: HashMap<String, Expr>,
     pub parent: Option<Rc<RefCell<Context>>>
@@ -45,14 +45,14 @@ impl Context {
     }
 }
 
-#[deriving(Clone)]
+#[derive(Clone)]
 pub enum Atom {
-    Int(int),
+    Int(i64),
     Sym(String),
     Fun(Func)
 }
 
-impl fmt::Show for Atom {
+impl fmt::String for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Atom::Int(ref v) => write!(f, "{}", v),
@@ -62,7 +62,7 @@ impl fmt::Show for Atom {
     }
 }
 
-impl fmt::Show for Expr {
+impl fmt::String for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Expr::Sexpr(ref v) => {
@@ -85,7 +85,7 @@ impl fmt::Show for Expr {
 }
 
 #[allow(dead_code)]
-#[deriving(Show)]
+#[derive(Show)]
 pub enum Error {
     Runtime(String),
     ZeroDivision,
@@ -96,7 +96,7 @@ pub enum Error {
 
 fn lookup(name: &str, ctx: Rc<RefCell<Context>>) -> Option<Expr> {
     match (ctx.borrow().table.get(name), ctx.borrow().parent.clone()) {
-        (Some(e), _) => Some(e.clone()),
+        (Some(e), _) => Some((*e).clone()),
         (None, Some(p)) => lookup(name, p),
         _ => None
     }
