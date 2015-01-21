@@ -102,12 +102,11 @@ fn lookup(name: &str, ctx: Rc<RefCell<Context>>) -> Option<Expr> {
     }
 }
 
-fn call_lambda(formals: Vec<String>, body: &Expr, args: Vec<Expr>, ctx: Rc<RefCell<Context>>) -> Result<Expr, Error> {
-    if formals.len() != args.len() {
-        Err(Error::Arity(format!("expected {} args, found {}", formals.len(), args.len())))
-    } else {
-        let bindings = formals.iter().zip(args.iter());
-        let bmap = bindings
+fn bind(formals: Vec<String>, args: Vec<Expr>, parent: Rc<RefCell<Context>>) -> Result<Context, Error> {
+    if formals.len() == args.len() {
+        let bindings = formals
+            .iter()
+            .zip(args.iter())
             .fold(
                 HashMap::new(),
                 |mut m, (name, val)| {
@@ -115,30 +114,21 @@ fn call_lambda(formals: Vec<String>, body: &Expr, args: Vec<Expr>, ctx: Rc<RefCe
                     m
                 });
 
-        let fctx = Context {
-            table: bmap,
-            parent: Some(ctx)
-        };
-
-
-        eval((*body).clone(), Rc::new(RefCell::new(fctx)))
+        Ok(Context { table: bindings, parent: Some(parent) })
+    } else {
+        Err(Error::Arity(format!("expected {} args, but received {}", formals.len(), args.len())))
     }
 }
 
 fn call(fun: Atom, xs: &[Expr], ctx: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     match fun {
-        Atom::Sym(ref name) => {
-            match lookup(name.as_slice(), ctx.clone()) {
-                Some(Expr::Atom(Atom::Fun(Func::Builtin(b)))) => b(xs.to_vec(), ctx.clone()),
-                Some(Expr::Atom(Atom::Fun(Func::Lambda(fs, b)))) => call_lambda(fs, &*b, xs.to_vec(), ctx.clone()),
-                None => Err(Error::NameResolution(format!("`{}` not in current context", name.to_string()))),
-                _ => Err(Error::InvalidType(format!("`{}` not a function", fun)))
-            }
-        },
-
         Atom::Fun(Func::Builtin(b)) => b(xs.to_vec(), ctx.clone()),
 
-        Atom::Fun(Func::Lambda(fs, b)) => call_lambda(fs, &*b, xs.to_vec(), ctx.clone()),
+        Atom::Fun(Func::Lambda(fs, b)) => {
+            let binding = try!(bind(fs, xs.to_vec(), ctx.clone()));
+
+            eval((*b).clone(), Rc::new(RefCell::new(binding)))
+        },
 
         _ => Err(Error::InvalidType(format!("`{}` not a function", fun)))
     }
