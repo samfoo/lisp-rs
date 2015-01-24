@@ -147,10 +147,20 @@ pub fn lambda(args: Vec<Expr>, _: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     }
 }
 
+fn global(ctx: Rc<RefCell<Context>>) -> Rc<RefCell<Context>> {
+    {
+        let ref c = ctx.borrow_mut();
+        match c.parent {
+            Some(ref p) => global(p.clone()),
+            None => ctx.clone()
+        }
+    }
+}
+
 pub fn def(args: Vec<Expr>, ctx: Rc<RefCell<Context>>) -> Result<Expr, Error> {
     match args.as_slice() {
         [Expr::Atom(Atom::Sym(ref name)), ref val] => {
-            ctx.borrow_mut().table.insert(name.to_string(), val.clone());
+            global(ctx).borrow_mut().table.insert(name.to_string(), val.clone());
             Ok(val.clone())
         },
 
