@@ -91,6 +91,7 @@ pub enum Error {
     ZeroDivision,
     NameResolution(String),
     InvalidType(String),
+    Syntax(String),
     Arity(String)
 }
 
@@ -102,21 +103,49 @@ fn lookup(name: &str, ctx: Rc<RefCell<Context>>) -> Option<Expr> {
     }
 }
 
-fn bind(formals: Vec<String>, args: Vec<Expr>, parent: Rc<RefCell<Context>>) -> Result<Context, Error> {
-    if formals.len() == args.len() {
-        let bindings = formals
+fn vargs(names: &[&str], xs: &str, args: Vec<Expr>, parent: Rc<RefCell<Context>>) -> Result<Context, Error> {
+    if names.len() <= args.len() {
+        let mut bindings = names
             .iter()
             .zip(args.iter())
-            .fold(
-                HashMap::new(),
-                |mut m, (name, val)| {
-                    m.insert(name.clone(), val.clone());
-                    m
-                });
+            .fold(HashMap::new(),
+            |mut m, (name, val)| {
+                m.insert(name.to_string(), val.clone());
+                m
+            });
+
+        bindings.insert(xs.to_string(), Expr::Sexpr(args[names.len()..].to_vec()));
 
         Ok(Context { table: bindings, parent: Some(parent) })
     } else {
-        Err(Error::Arity(format!("expected {} args, but received {}", formals.len(), args.len())))
+        Err(Error::Arity(format!("expected at least {} args, but received {}", names.len(), args.len())))
+    }
+}
+
+fn bind(list: Vec<String>, args: Vec<Expr>, parent: Rc<RefCell<Context>>) -> Result<Context, Error> {
+    let formals = list.iter().map(|s| s.as_slice()).collect::<Vec<&str>>();
+
+    match formals.as_slice() {
+        [names.., "&", xs] => {
+            vargs(names, xs, args, parent)
+        },
+
+        _ => {
+            if formals.len() == args.len() {
+                let bindings = formals.iter()
+                    .zip(args.iter())
+                    .fold(
+                        HashMap::new(),
+                        |mut m, (name, val)| {
+                            m.insert(name.to_string(), val.clone());
+                            m
+                        });
+
+                Ok(Context { table: bindings, parent: Some(parent) })
+            } else {
+                Err(Error::Arity(format!("expected {} args, but received {}", formals.len(), args.len())))
+            }
+        }
     }
 }
 

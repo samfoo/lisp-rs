@@ -1,4 +1,5 @@
 #![feature(box_syntax)]
+#![feature(advanced_slice_patterns)]
 #![feature(plugin)]
 #[plugin] extern crate peg_syntax_ext;
 
